@@ -315,10 +315,19 @@ echo json_encode($response);
 - 必須のスロットとプロンプト
 - スロット検証ルールとプロンプト
 
-- Dialog.Delegate オートデリゲート(対話の制御を完全にAlexaに任せる)
-- Dialog.ElicitSlot スロット値を収集する発話。旅予約なら、「目的地は？」「いつ出発しますか？」
-- Dialog.ConfirmSlot スロット値を確認する
+### ダイアログインターフェイス
+
 - Dialog.ConfirmIntent 全てのスロット値を収集した状態での確認
+- Dialog.ConfirmSlot スロット値を確認する
+- Dialog.ElicitSlot スロット値を収集する発話。旅予約なら、「目的地は？」「いつ出発しますか？」
+- Dialog.Delegate オートデリゲート(対話の制御を完全にAlexaに任せる)
+
+### tips
+- はい/いいえ の二択の応答を期待する場面では、Dialog.ConfirmIntent, Dialog.ConfirmSlot を使用するようにした
+- スロットのないインテントでダイアログを使う場合は、対話モデルでダミーのインテント確認プロンプトを定義すれば良い
+- Dialog.Delegate は原則利用しない。エンドポイント側で会話の流れを制御できなくなるため
+- Dialog.Delegate 以外のダイアログインターフェイスでも他のインテントを渡すことができる
+- 対話モデルから余計なインテントは削除しておく
 
 ## VUI設計が一番大事
 
