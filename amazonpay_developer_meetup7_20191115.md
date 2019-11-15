@@ -26,7 +26,7 @@
 | 11/14 | Alexaスキル | [ミラショーン オンラインストア](https://www.amazon.co.jp/dp/B081GGCVDG/) |
 
 - SMAPI を利用したスキル登録・審査申請機能
-- Buyer ID を利用した、ECサイト会員との紐付け
+- Buyer ID を利用したECサイト会員との紐付け。ECサイトで AmazonPay 購入経験または Login With Amazon ボタンでログイン済ならば、Buyer ID で紐付けられる。
 
 スキル審査は、合格まで3回が目安
 
