@@ -17,14 +17,27 @@
 
 ## 経緯
 
-アマゾンジャパン様のご依頼で、EC-CUBE向けAlexaプラグインを開発、無事リリースできました。
+- SUPER CLASSIC 様への Amazon Pay 導入から、弊社で EC-CUBE Amazon Pay プラグインを開発
+- EC-CUBE向け Alexaプラグイン を開発、無事リリース
 
 | リリース日 | 成果物 | 公開URL |
 | -------- |-------|--------|
 | 11/11 | EC-CUBEプラグイン | [Alexaカスタムスキル(4.0系)プラグイン](https://www.ec-cube.net/products/detail.php?product_id=1968) |
 | 11/14 | Alexaスキル | [ミラショーン オンラインストア](https://www.amazon.co.jp/dp/B081GGCVDG/) |
 
-先週の記憶が曖昧
+- SMAPI を利用したスキル登録・審査申請機能
+- Buyer ID を利用した、ECサイト会員との紐付け
+
+スキル審査は、合格まで3回が目安
+
+| 審査結果 | 審査回数 | 合否 |
+| -------- |--------|----|
+| 10/25 | 1 | × |
+| 10/31 | 2 | × |
+| 11/5 | 3 | ○ |
+
+- 11/11 にミラショーン様スキル審査を申請
+- *先週の記憶が曖昧*
 
 ## 本日お伝えしたいこと
 
@@ -34,8 +47,10 @@
 - VUI設計が一番大事。技術的なハードルはそれはそれほど高くない
 
 ## SDK は必要か？
+
 - 公式サポートSDKが存在するのは Node.js, Python or Java
 - インテグレート先の EC-CUBE は PHP で実装。公式SDKは存在しない
+- Node.js のサンプルや [応答の形式](https://developer.amazon.com/ja/docs/custom-skills/request-and-response-json-reference.html#response-format) などを見て試してみた
 
 ```php
 <?php
@@ -59,12 +74,57 @@ echo json_encode($response);
 
 ```
 
-https://github.com/maxbeckers/amazon-alexa-php
-https://github.com/iplogic-support/amazon-alexa-php
+- SDK の主な機能は、入力jsonのパース、出力jsonの組み立て、Alexaリクエストの検証
+- [Alexaから送信されたリクエストを手動で検証する](https://developer.amazon.com/ja/docs/custom-skills/host-a-custom-skill-as-a-web-service.html#manually-verify-request-sent-by-alexa)
+- PHPで実装された非公式SDK https://github.com/maxbeckers/amazon-alexa-php
+- 弊社でAmazon Pay対応を追加した物 https://github.com/iplogic-support/amazon-alexa-php
 
-## Alexa での AmazonPay 決済
+```php
+    /**
+     * Alexa端末からのリクエストを捌くエンドポイント
+     *
+     * @Route("/alexa/endpoint", name="endpoint", methods={"POST","GET"})
+     *
+     * @param HttpRequest $httpRequest
+     */
+    public function endpoint(HttpRequest $httpRequest)
+    {
+        try {
+            $alexaRequest = Request::fromAmazonRequest($httpRequest->getContent(), $_SERVER['HTTP_SIGNATURECERTCHAINURL'], $_SERVER['HTTP_SIGNATURE']);
+            // Request validation
+            $validator = new RequestValidator();
+            $validator->validate($alexaRequest);
+        } catch (\Throwable $e) {
+            // BadRequest.
+            return new Response(Response::$statusTexts[400], Response::HTTP_BAD_REQUEST, ['Content-Type' => 'text/plain']);
+        }
 
-https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#setup-1
+        // add handlers to registry
+        $requestHandlerRegistry = new RequestHandlerRegistry([
+            $this->launchRequestHandler,
+            $this->pointRequestHandler,
+            // handlers...
+            $this->sessionEndedRequestHandler,
+            $this->missingRequestHandler,
+        ]);
+
+        // handle request
+        $requestHandler = $requestHandlerRegistry->getSupportingHandler($alexaRequest);
+        $alexaResponse  = $requestHandler->handleRequest($alexaRequest);
+
+        // return JSON RESPONSE
+        $jsonResponse = new JsonResponse($alexaResponse);
+        return $jsonResponse->send();
+    }
+```
+
+## Alexaエンドポイントは json 入出力の Web API
+
+- Alexa AmazonPay 決済の json の実際
+- Setup/Charge API
+- ペアで利用する。Setupで準備、Chargeでオーソリ/キャプチャを行う
+- [セットアップ](https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#setup-1)
+- *token* にセッションを特定する任意の値を設定すると、Connections.Response で受け取る事ができる
 
 ```json
 {
@@ -98,7 +158,7 @@ https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.
 					},
 					"needAmazonShippingAddress": false,
 					"sandboxMode": true,
-					"sandboxCustomerEmailId": "takashi@crazyhacks.net"
+					"sandboxCustomerEmailId": "takashi@iplogic.co.jp"
 				},
 				"token": "UNIQUE-TOKEN"
 			}
@@ -107,7 +167,7 @@ https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.
 }
 ```
 
-https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#%E5%BF%9C%E7%AD%94%E8%A6%81%E7%B4%A0
+- [セットアップの応答要素](https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#%E5%BF%9C%E7%AD%94%E8%A6%81%E7%B4%A0)
 
 ```json
 {
@@ -137,7 +197,7 @@ https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.
 }
 ```
 
-https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#charge-1
+- [チャージ](https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#charge-1)
 
 ```json
 {
@@ -187,7 +247,7 @@ https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.
 }
 ```
 
-https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#%E5%BF%9C%E7%AD%94%E8%A6%81%E7%B4%A0-1
+- [チャージの応答要素](https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.html#%E5%BF%9C%E7%AD%94%E8%A6%81%E7%B4%A0-1)
 
 ```json
 {
@@ -243,18 +303,25 @@ https://developer.amazon.com/ja/docs/amazon-pay-alexa/amazon-pay-apis-for-alexa.
 
 ## ダイアログモデルを活用すべし
 
-あるインテントでダイアログ機能を使うには？
+スキルを実装する前に理解しておきたいドキュメント
+- [ダイアログモデルを使用してあいまい応答を管理する](https://developer.amazon.com/ja/docs/custom-skills/use-a-dialog-model-to-manage-ambiguous-responses.html)
+- [Dialogインターフェースのリファレンス](https://developer.amazon.com/ja/docs/custom-skills/dialog-interface-reference.html)
+
+### あるインテントでダイアログ機能を使うには？
+
 インテントに、少なくとも下記のどれか一つが定義されていること
 - インテントの確認プロンプト
 - スロットの確認プロンプト
 - 必須のスロットとプロンプト
 - スロット検証ルールとプロンプト
 
-Dialog.Delegate
-Dialog.ElicitSlot
-Dialog.ConfirmSlot
-Dialog.ConfirmIntent
+- Dialog.Delegate オートデリゲート(対話の制御を完全にAlexaに任せる)
+- Dialog.ElicitSlot スロット値を収集する発話。旅予約なら、「目的地は？」「いつ出発しますか？」
+- Dialog.ConfirmSlot スロット値を確認する
+- Dialog.ConfirmIntent 全てのスロット値を収集した状態での確認
 
 ## VUI設計が一番大事
 
 - 絶対に理解しておきたい [音声デザインガイド](https://developer.amazon.com/ja/designing-for-voice/)
+
+## 全てに感謝を
